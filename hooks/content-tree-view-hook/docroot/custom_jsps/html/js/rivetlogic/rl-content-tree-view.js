@@ -129,7 +129,7 @@ AUI.add('rl-content-tree-view', function (A) {
         	this.contentRoot.set(NODE_ATTR_FULL_LOADED, true);
         	
         	// Adding this event on this way because the click event seems on creation seems to be on tree level
-        	var boundingBox = this.contentTree.get(BOUNDING_BOX);        	
+        	var boundingBox = this.contentTree.get(BOUNDING_BOX);  
         	boundingBox.delegate('click', A.bind(instance._clickHandler,this), NODE_SELECTOR); 
         	boundingBox.delegate('mouseover', A.bind(instance._mouseOverHandler,this), NODE_SELECTOR); 
 
@@ -146,6 +146,7 @@ AUI.add('rl-content-tree-view', function (A) {
             // compiles template
             this.compiledItemSelectorTemplate = A.Handlebars.compile(itemSelectorTemplate);
         },
+       
         
         addContentFolder: function(newNodeConfig, parentNode){	
         	this._addContentNode(newNodeConfig, parentNode, true);
@@ -223,7 +224,17 @@ AUI.add('rl-content-tree-view', function (A) {
         			this._moveJournalContentNode(node, target);
         		}
         	}
-        	this.contentTree.bindUI();
+        	
+        	
+ /*This code removes the events and creates new binding attachment over click and mouseover events to prevent multiple bindings for the same event that produce malfunction in expand-collapse and drag-and-drop events. */
+        	boundingBox = this.contentTree.get(BOUNDING_BOX);
+        	boundingBox.detach('click');
+        	boundingBox.detach('mouseover');
+        	boundingBox.delegate('click', A.bind(this._clickHandler,this), NODE_SELECTOR); 
+        	boundingBox.delegate('mouseover', A.bind(this._mouseOverHandler,this), NODE_SELECTOR); 
+        	this.contentTree.bindUI(); 
+        	
+        	
         },
         
         _moveDLContentNode: function(node, target){
@@ -327,6 +338,7 @@ AUI.add('rl-content-tree-view', function (A) {
         _mouseOverHandler: function(event){
         	event.stopPropagation();
         	var treeNode = this.contentTree.getNodeById(event.currentTarget.get(NODE_ATTR_ID));
+        	
         	this._showPreview(treeNode);
         },
         
@@ -363,7 +375,7 @@ AUI.add('rl-content-tree-view', function (A) {
         
         _clickHandler: function(event){
 
-        	event.stopPropagation();
+        event.stopPropagation();
     	
         	var isHitArea = event.target.hasClass('tree-hitarea');
         	var isCheckbox = event.target.hasClass('tree-node-checkbox-container');
@@ -471,13 +483,24 @@ AUI.add('rl-content-tree-view', function (A) {
         	
         	if (newNodeConfig.previewURL !== undefined){
         		newNode.set(NODE_ATTR_PREVIEW_URL, newNodeConfig.previewURL);
-        	}         	
-        	parentNode.appendChild(newNode);        	
-    		this.contentTree.bindUI();        	
+        	} 
+        	
+        	parentNode.appendChild(newNode); 
+        	
+        	
         	if (nodeType === NODE_TYPE_CHECKBOX){
         		// add checkbox
         		this._addProcessCheckbox(newNodeConfig);
         	}
+        	
+/*This code removes the events and creates new binding attachment over click and mouseover events to prevent multiple bindings for the same event that produce malfunction in expand-collapse and drag-and-drop events. */
+        	boundingBox = this.contentTree.get(BOUNDING_BOX);
+        	boundingBox.detach('click');
+        	boundingBox.detach('mouseover');
+        	boundingBox.delegate('click', A.bind(this._clickHandler,this), NODE_SELECTOR); 
+        	boundingBox.delegate('mouseover', A.bind(this._mouseOverHandler,this), NODE_SELECTOR); 
+        	this.contentTree.bindUI(); 
+        	
         },
         
         _addProcessCheckbox: function(newNodeConfig){
