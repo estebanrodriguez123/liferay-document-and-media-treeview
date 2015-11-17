@@ -145,6 +145,12 @@ AUI.add('rl-content-tree-view', function (A) {
         	
             // compiles template
             this.compiledItemSelectorTemplate = A.Handlebars.compile(itemSelectorTemplate);
+            
+            // hotfix to avoid tree view hanging and not responding, removing the helper text for now
+            var helperDOMEl = document.getElementsByClassName("tree-drag-helper");
+            if (0 < helperDOMEl.length && typeof(helperDOMEl[0]) !== "undefined") {
+            	helperDOMEl[0].parentNode.removeChild(helperDOMEl[0]);
+            }
         },
        
         
@@ -182,7 +188,7 @@ AUI.add('rl-content-tree-view', function (A) {
         	event.target.after('dragNodeChange', 
     			function() {
          			if (!instance.mouseIsDown){
-         				instance.contentTree.get(TOOLTIP_HELPER_PROPERTY).hide();
+         				
          			}
  			});
    			
@@ -483,10 +489,18 @@ AUI.add('rl-content-tree-view', function (A) {
         	
         	if (newNodeConfig.previewURL !== undefined){
         		newNode.set(NODE_ATTR_PREVIEW_URL, newNodeConfig.previewURL);
-        	} 
+        	}
         	
-        	parentNode.appendChild(newNode); 
+        	// for some reason, sometimes the node is duplicated after being dragged (IE and Firefox, rare in Chrome).
+        	// this forces a validation to check if the node is already added to the destination node
+        	var match = parentNode.getChildren().some( function (child) {
+        		return child.get(NODE_ATTR_ENTRY_ID) === newNode.get(NODE_ATTR_ENTRY_ID);
+        	});
         	
+        	// only add the node if it is not already there
+        	if (!match) {
+        		parentNode.appendChild(newNode);
+        	}
         	
         	if (nodeType === NODE_TYPE_CHECKBOX){
         		// add checkbox
