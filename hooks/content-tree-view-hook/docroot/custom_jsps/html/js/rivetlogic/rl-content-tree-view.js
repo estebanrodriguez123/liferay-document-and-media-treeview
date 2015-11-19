@@ -66,8 +66,6 @@ AUI.add('rl-content-tree-view', function (A) {
     	defaultArticleImage: null,
     	viewPageBaseURL: null,
     	shortcutNode: null,
-    	//Flag to fix with tooltip when a folder is opened
-    	mouseIsDown: false,
 
         initializer: function () {
         
@@ -105,8 +103,7 @@ AUI.add('rl-content-tree-view', function (A) {
         		        	{
         		        		id: folderId,
         		        		label: folderLabel,
-        		        		draggable: false,
-        		        		alwaysShowHitArea: true,
+        		        		lazyLoad: false,
         		        		leaf:false,
         		        		expanded: true
         		        	}
@@ -115,11 +112,7 @@ AUI.add('rl-content-tree-view', function (A) {
         		       		'drop:hit': A.bind(instance._afterDropHitHandler,this),
         		       	},
         		       	on: {
-        		       		'drop:hit': A.bind(instance._dropHitHandler,this),
-        		       		/* Next three events are used to fix but with tooltip when a folder is opened */
-        		       		'drag:start':A.bind(instance._dragStart,this),
-        		       		'drag:mouseDown': A.bind(instance._mouseDown,this),
-        		       		'drag:mouseup': A.bind(instance._mouseUp,this)
+        		       		'drop:hit': A.bind(instance._dropHitHandler,this)
         		       	}
         		      }
         		    ).render();
@@ -175,26 +168,6 @@ AUI.add('rl-content-tree-view', function (A) {
         	return (this.treeTarget === A.Rivet.TreeTargetDL);
         },
         
-        _mouseDown: function (event){
-   			this.mouseIsDown = true;
-        },
-        
-        _mouseUp: function (event){
-   			this.mouseIsDown = false;
-        },
-        
-        _dragStart: function (event){
-        	var instance  = this;
-        	event.target.after('dragNodeChange', 
-    			function() {
-         			if (!instance.mouseIsDown){
-         				
-         			}
- 			});
-   			
-   			
-        },
-        
         _dropHitHandler: function(event){        	
         	var dragNode = event.drag.get(NODE).get(PARENT_NODE);
             var dragTreeNode = dragNode.getData(TREE_NODE);
@@ -231,15 +204,13 @@ AUI.add('rl-content-tree-view', function (A) {
         		}
         	}
         	
-        	
- /*This code removes the events and creates new binding attachment over click and mouseover events to prevent multiple bindings for the same event that produce malfunction in expand-collapse and drag-and-drop events. */
+        	this.contentTree.bindUI();
+ /*This code removes the events and creates new binding attachment over  and mouseover events to prevent multiple bindings for the same event that produce malfunction in expand-collapse and drag-and-drop events. */
         	boundingBox = this.contentTree.get(BOUNDING_BOX);
         	boundingBox.detach('click');
         	boundingBox.detach('mouseover');
         	boundingBox.delegate('click', A.bind(this._clickHandler,this), NODE_SELECTOR); 
         	boundingBox.delegate('mouseover', A.bind(this._mouseOverHandler,this), NODE_SELECTOR); 
-        	this.contentTree.bindUI(); 
-        	
         	
         },
         
@@ -381,7 +352,7 @@ AUI.add('rl-content-tree-view', function (A) {
         
         _clickHandler: function(event){
 
-        event.stopPropagation();
+        	event.stopPropagation();
     	
         	var isHitArea = event.target.hasClass('tree-hitarea');
         	var isCheckbox = event.target.hasClass('tree-node-checkbox-container');
@@ -507,14 +478,13 @@ AUI.add('rl-content-tree-view', function (A) {
         		this._addProcessCheckbox(newNodeConfig);
         	}
         	
+        	this.contentTree.bindUI();
 /*This code removes the events and creates new binding attachment over click and mouseover events to prevent multiple bindings for the same event that produce malfunction in expand-collapse and drag-and-drop events. */
         	boundingBox = this.contentTree.get(BOUNDING_BOX);
         	boundingBox.detach('click');
         	boundingBox.detach('mouseover');
         	boundingBox.delegate('click', A.bind(this._clickHandler,this), NODE_SELECTOR); 
-        	boundingBox.delegate('mouseover', A.bind(this._mouseOverHandler,this), NODE_SELECTOR); 
-        	this.contentTree.bindUI(); 
-        	
+        	boundingBox.delegate('mouseover', A.bind(this._mouseOverHandler,this), NODE_SELECTOR);
         },
         
         _addProcessCheckbox: function(newNodeConfig){
