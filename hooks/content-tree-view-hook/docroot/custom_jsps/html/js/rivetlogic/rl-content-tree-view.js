@@ -138,12 +138,6 @@ YUI.add('rl-content-tree-view', function (A) {
         	
             // compiles template
             this.compiledItemSelectorTemplate = A.Handlebars.compile(itemSelectorTemplate);
-            
-            // hotfix to avoid tree view hanging and not responding, removing the helper text for now
-            //var helperDOMEl = document.getElementsByClassName("tree-drag-helper");
-            //if (0 < helperDOMEl.length && typeof(helperDOMEl[0]) !== "undefined") {
-            //	helperDOMEl[0].parentNode.removeChild(helperDOMEl[0]);
-            //}
         },
        
         
