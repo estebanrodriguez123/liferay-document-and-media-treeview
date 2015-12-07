@@ -15,7 +15,7 @@
  * Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
-AUI.add('rl-content-tree-view', function (A) {
+YUI.add('rl-content-tree-view', function (A) {
 	
 	A.namespace('Rivet');
 	
@@ -105,7 +105,7 @@ AUI.add('rl-content-tree-view', function (A) {
         		        		label: folderLabel,
         		        		lazyLoad: false,
         		        		leaf:false,
-        		        		expanded: true
+        		        		expanded: true,
         		        	}
         		       	],
         		       	after: {
@@ -140,10 +140,10 @@ AUI.add('rl-content-tree-view', function (A) {
             this.compiledItemSelectorTemplate = A.Handlebars.compile(itemSelectorTemplate);
             
             // hotfix to avoid tree view hanging and not responding, removing the helper text for now
-            var helperDOMEl = document.getElementsByClassName("tree-drag-helper");
-            if (0 < helperDOMEl.length && typeof(helperDOMEl[0]) !== "undefined") {
-            	helperDOMEl[0].parentNode.removeChild(helperDOMEl[0]);
-            }
+            //var helperDOMEl = document.getElementsByClassName("tree-drag-helper");
+            //if (0 < helperDOMEl.length && typeof(helperDOMEl[0]) !== "undefined") {
+            //	helperDOMEl[0].parentNode.removeChild(helperDOMEl[0]);
+            //}
         },
        
         
@@ -203,15 +203,6 @@ AUI.add('rl-content-tree-view', function (A) {
         			this._moveJournalContentNode(node, target);
         		}
         	}
-        	
-        	
- /*This code removes the events and creates new binding attachment over  and mouseover events to prevent multiple bindings for the same event that produce malfunction in expand-collapse and drag-and-drop events. */
-        	boundingBox = this.contentTree.get(BOUNDING_BOX);
-        	boundingBox.detach('click');
-        	boundingBox.detach('mouseover');
-        	boundingBox.delegate('click', A.bind(this._clickHandler,this), NODE_SELECTOR); 
-        	boundingBox.delegate('mouseover', A.bind(this._mouseOverHandler,this), NODE_SELECTOR);
-        	this.contentTree.bindUI();
         },
         
         _moveDLContentNode: function(node, target){
@@ -412,7 +403,7 @@ AUI.add('rl-content-tree-view', function (A) {
         	this.contentTree.get(BOUNDING_BOX).all(NODE_CHECKBOX_SELECTOR).each(function(node){
         	var nodeChecked = node.one('[type=checkbox]').attr('checked');
         	if (nodeChecked !== checked){
-        		  node.simulate('click');
+        		  node.fire('click');
         	  }
         	});
         },
@@ -477,14 +468,6 @@ AUI.add('rl-content-tree-view', function (A) {
         		// add checkbox
         		this._addProcessCheckbox(newNodeConfig);
         	}
-        	
-/*This code removes the events and creates new binding attachment over click and mouseover events to prevent multiple bindings for the same event that produce malfunction in expand-collapse and drag-and-drop events. */
-        	boundingBox = this.contentTree.get(BOUNDING_BOX);
-        	boundingBox.detach('click');
-        	boundingBox.detach('mouseover');
-        	boundingBox.delegate('click', A.bind(this._clickHandler,this), NODE_SELECTOR); 
-        	boundingBox.delegate('mouseover', A.bind(this._mouseOverHandler,this), NODE_SELECTOR);
-        	this.contentTree.bindUI();
         },
         
         _addProcessCheckbox: function(newNodeConfig){

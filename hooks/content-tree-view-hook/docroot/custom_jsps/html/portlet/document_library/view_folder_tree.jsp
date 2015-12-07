@@ -28,7 +28,6 @@ PortletURL tempRowURL = (PortletURL)request.getAttribute("view_entries.jsp-tempR
 %> 
 
 <aui:script use="rl-content-tree-view">
-
 	<portlet:namespace />treeView.addContentFolder({
 		id: '<%= folder.getFolderId() %>',
 		label: '<%= folder.getName() %>',
