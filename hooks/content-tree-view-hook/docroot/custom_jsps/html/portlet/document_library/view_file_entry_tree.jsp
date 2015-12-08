@@ -45,16 +45,15 @@ if (fileShortcut != null) {
 %>
 
 <aui:script use="rl-content-tree-view">
-
-<portlet:namespace />treeView.addContentEntry({
-	id : '<%= latestFileVersion.getFileEntryId() %>',
-	label: '<%= latestFileVersion.getTitle() %>',
-	shortcut: <%=isFileShortcut %>,
-	showCheckbox: '<%= DLFileEntryPermission.contains(permissionChecker, fileEntry, ActionKeys.DELETE) || DLFileEntryPermission.contains(permissionChecker, fileEntry, ActionKeys.UPDATE) %>',
-	rowCheckerId: '<%= String.valueOf(rowCheckerId) %>',
-	rowCheckerName: '<%= rowCheckerName %>',
-	parentFolderId: '<%= parentFolderId %>',
-	previewURL:'<%= DLUtil.getThumbnailSrc(fileEntry, latestFileVersion, fileShortcut, themeDisplay) %>',
-	viewURL: '<%= tempRowURL %>'
-});
+	<portlet:namespace />treeView.addContentEntry({
+		id : '<%= latestFileVersion.getFileEntryId() %>',
+		label: '<%= latestFileVersion.getTitle() %>',
+		shortcut: <%=isFileShortcut %>,
+		showCheckbox: '<%= DLFileEntryPermission.contains(permissionChecker, fileEntry, ActionKeys.DELETE) || DLFileEntryPermission.contains(permissionChecker, fileEntry, ActionKeys.UPDATE) %>',
+		rowCheckerId: '<%= String.valueOf(rowCheckerId) %>',
+		rowCheckerName: '<%= rowCheckerName %>',
+		parentFolderId: '<%= parentFolderId %>',
+		previewURL:'<%= DLUtil.getThumbnailSrc(fileEntry, latestFileVersion, fileShortcut, themeDisplay) %>',
+		viewURL: '<%= tempRowURL %>'
+	});
 </aui:script>

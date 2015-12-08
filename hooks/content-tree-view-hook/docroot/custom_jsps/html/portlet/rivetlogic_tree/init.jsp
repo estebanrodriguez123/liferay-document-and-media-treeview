@@ -29,7 +29,7 @@ if (themeDisplay.isSignedIn()){
 %>
 
 <aui:script>                   
-AUI().applyConfig({
+YUI().applyConfig({
     groups : {
         'rivet-custom' : {
             base : '/html/js/rivetlogic/',
@@ -38,7 +38,8 @@ AUI().applyConfig({
                 'rl-content-tree-view': {
                         path: 'rl-content-tree-view.js',
                         requires: [
-                            'aui-tree-view'
+                            'aui-tree-view',
+                            'node-event-simulate'
                         ]
                 },
 
