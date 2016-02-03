@@ -50,6 +50,7 @@ YUI.add('rl-content-tree-view', function (A) {
 	var REG_EXP_GLOBAL = 'g';
 	var SHORTCUT_LABEL = 'shortcut-tree-node-label';
 	var TOOLTIP_HELPER_PROPERTY = 'helper';
+	var TOOLTIP_HELPER_LABEL = '.tree-drag-helper-label';
 	 
     A.Rivet.ContentTreeView = A.Base.create('rl-content-tree-view',A.Base, [], {
 
@@ -76,6 +77,7 @@ YUI.add('rl-content-tree-view', function (A) {
         	this.defaultDocumentImagePath = this.get('defaultDocumentImagePath');
         	this.defaultArticleImage = this.get('defaultArticleImage');
         	this.mouseIsDown = false;
+        	this.checkedArray = [];
         	
         	var folderId = this.get('rootFolderId');
         	var folderLabel = this.get('rootFolderLabel');
@@ -110,6 +112,7 @@ YUI.add('rl-content-tree-view', function (A) {
         		       	],
         		       	after: {
         		       		'drop:hit': A.bind(instance._afterDropHitHandler,this),
+        		       		'drag:start': A.bind(instance._dragStartHandler, this)
         		       	},
         		       	on: {
         		       		'drop:hit': A.bind(instance._dropHitHandler,this)
@@ -162,11 +165,36 @@ YUI.add('rl-content-tree-view', function (A) {
         	return (this.treeTarget === A.Rivet.TreeTargetDL);
         },
         
-        _dropHitHandler: function(event){        	
-        	var dragNode = event.drag.get(NODE).get(PARENT_NODE);
-            var dragTreeNode = dragNode.getData(TREE_NODE);
-            var dropNode = event.drop.get(NODE).get(PARENT_NODE);
-            var dropTreeNode = dropNode.getData(TREE_NODE);          
+        _dragStartHandler: function(event) {
+        	// override the helper label when moving multiple elements
+        	if (this.checkedArray.length && this.checkedArray.length > 1) {
+        		var helperLabel = A.one(TOOLTIP_HELPER_LABEL);
+            	helperLabel.html('Move ' + this.checkedArray.length + ' elements');
+        	}
+        },
+        
+        _dropHitHandler: function(event) {
+        	var self = this;
+        	var dropNode = event.drop.get(NODE).get(PARENT_NODE);
+        	var dropTreeNode = dropNode.getData(TREE_NODE);
+        	if (self.checkedArray.length && self.checkedArray.length > 1) {
+        		for (var i = 0; i < self.checkedArray.length; i++) {
+        			var dragNode = A.one("#" + self.checkedArray[i]);
+        			var dragTreeNode = dragNode.getData(TREE_NODE);
+        			
+        			self._moveSingleElement(dragTreeNode, dropTreeNode);
+    	            self.contentRoot.removeChild(dragTreeNode);
+    	            dropTreeNode.appendChild(dragTreeNode);
+    	            self._toggleCheckBox(self.checkedArray[i]);
+        		}
+        	} else {
+        		var dragNode = event.drag.get(NODE).get(PARENT_NODE);
+        		var dragTreeNode = dragNode.getData(TREE_NODE);
+	            self._moveSingleElement(dragTreeNode, dropTreeNode);
+        	}
+        },
+        
+        _moveSingleElement: function(dragTreeNode, dropTreeNode) {
             if (!(dropTreeNode instanceof A.TreeNode)) {
                 event.preventDefault();
             }
@@ -376,11 +404,30 @@ YUI.add('rl-content-tree-view', function (A) {
         
         _clickCheckBox: function(event){
         	var selectedNodeId = event.currentTarget.attr(NODE_ATTR_ID);
-        	var relatedCheckbox = this.hiddenFieldsBox.one('[type=checkbox][value='+selectedNodeId+']');        	
-        	if (relatedCheckbox !== null){
-        		relatedCheckbox.simulate("click");
+        	
+        	// search for the id in the array
+        	var index = this.checkedArray.indexOf(selectedNodeId);
+        	
+        	// add the nodeId to the checked array
+        	if (index > -1) {
+        		this.checkedArray.splice(index, 1);
+        	} else {
+        		this.checkedArray.push(selectedNodeId);
         	}
-        	 
+        	
+        	// trigger the event to simulate the click on the checkbox (toggle toolbar additional options).
+        	this._toggleCheckBox(selectedNodeId);
+        },
+        
+        _toggleCheckBox: function (nodeId) {
+        	var relatedCheckbox = this.hiddenFieldsBox.one('[type=checkbox][value='+nodeId+']');
+        	if (relatedCheckbox !== null) {
+        		relatedCheckbox.simulate('click');
+        	}
+        },
+        
+        _resetCheckedArray: function () {
+        	this.checkedArray.splice(0, this.checkedArray.length);
         },
                
         _clickHitArea: function(event){
