@@ -51,6 +51,7 @@ YUI.add('rl-content-tree-view', function (A) {
 	var SHORTCUT_LABEL = 'shortcut-tree-node-label';
 	var TOOLTIP_HELPER_PROPERTY = 'helper';
 	var TOOLTIP_HELPER_LABEL = '.tree-drag-helper-label';
+	var APPEND = "append";
 	 
     A.Rivet.ContentTreeView = A.Base.create('rl-content-tree-view',A.Base, [], {
 
@@ -175,23 +176,30 @@ YUI.add('rl-content-tree-view', function (A) {
         
         _dropHitHandler: function(event) {
         	var self = this;
-        	var dropNode = event.drop.get(NODE).get(PARENT_NODE);
-        	var dropTreeNode = dropNode.getData(TREE_NODE);
-        	if (self.checkedArray.length && self.checkedArray.length > 1) {
-        		for (var i = 0; i < self.checkedArray.length; i++) {
-        			var dragNode = A.one("#" + self.checkedArray[i]);
-        			var dragTreeNode = dragNode.getData(TREE_NODE);
-        			
-        			self._moveSingleElement(dragTreeNode, dropTreeNode);
-    	            self.contentRoot.removeChild(dragTreeNode);
-    	            // move append child to callback function of move
-    	            //dropTreeNode.appendChild(dragTreeNode);
-    	            self._toggleCheckBox(self.checkedArray[i]);
-        		}
-        	} else {
-        		var dragNode = event.drag.get(NODE).get(PARENT_NODE);
-        		var dragTreeNode = dragNode.getData(TREE_NODE);
-	            self._moveSingleElement(dragTreeNode, dropTreeNode);
+        	// only move the element(s) when appending to a folder
+        	if (self.contentTree.dropAction === APPEND) {
+        		var dropNode = event.drop.get(NODE).get(PARENT_NODE);
+	        	var dropTreeNode = dropNode.getData(TREE_NODE);
+	        	if (self.checkedArray.length && self.checkedArray.length > 1) {
+	        		for (var i = 0; i < self.checkedArray.length; i++) {
+	        			var dragNode = A.one("#" + self.checkedArray[i]);
+	        			
+	        			if (dragNode) {
+	        				var dragTreeNode = dragNode.getData(TREE_NODE);
+		        			
+		        			self._moveSingleElement(dragTreeNode, dropTreeNode);
+		    	            
+		    	            // move append child to callback function of move
+		    	            //dropTreeNode.appendChild(dragTreeNode);
+		    	            self._toggleCheckBox(self.checkedArray[i]);
+	        			}
+		        			
+	        		}
+	        	} else {
+	        		var dragNode = event.drag.get(NODE).get(PARENT_NODE);
+	        		var dragTreeNode = dragNode.getData(TREE_NODE);
+		            self._moveSingleElement(dragTreeNode, dropTreeNode);
+	        	}
         	}
         },
         
@@ -204,13 +212,15 @@ YUI.add('rl-content-tree-view', function (A) {
             }
         },
         
-        _afterDropHitHandler: function(event){     	
-            var dropNode = event.drop.get(NODE).get(PARENT_NODE);
-            var dropTreeNode = dropNode.getData(TREE_NODE);
-        	if (!(this._isFullLoaded(dropTreeNode))){
-        		dropTreeNode.empty();
-    			this._getChildren(dropTreeNode, this);
-    		}
+        _afterDropHitHandler: function(event) {
+        	if (this.contentTree.dropAction === APPEND) {
+        		var dropNode = event.drop.get(NODE).get(PARENT_NODE);
+	            var dropTreeNode = dropNode.getData(TREE_NODE);
+	        	if (!(this._isFullLoaded(dropTreeNode))){
+	        		dropTreeNode.empty();
+	    			this._getChildren(dropTreeNode, this);
+	    		}
+        	}
         },       
         
         _moveContentNode: function(node, target){
@@ -283,7 +293,8 @@ YUI.add('rl-content-tree-view', function (A) {
                     )
     			}, function (file) {
     				if (self.checkedArray && self.checkedArray.length > 1) {
-        				target.appendChild(entry);
+    					self.contentRoot.removeChild(entry);
+    					target.appendChild(entry);
     				}
     			}
         	);
