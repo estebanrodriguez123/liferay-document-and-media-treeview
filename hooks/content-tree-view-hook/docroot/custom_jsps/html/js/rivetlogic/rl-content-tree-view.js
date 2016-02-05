@@ -184,7 +184,8 @@ YUI.add('rl-content-tree-view', function (A) {
         			
         			self._moveSingleElement(dragTreeNode, dropTreeNode);
     	            self.contentRoot.removeChild(dragTreeNode);
-    	            dropTreeNode.appendChild(dragTreeNode);
+    	            // move append child to callback function of move
+    	            //dropTreeNode.appendChild(dragTreeNode);
     	            self._toggleCheckBox(self.checkedArray[i]);
         		}
         	} else {
@@ -267,7 +268,8 @@ YUI.add('rl-content-tree-view', function (A) {
         	);
         },
         
-        _moveDLFileEntry: function(entry, target){        	
+        _moveDLFileEntry: function(entry, target) {
+        	var self = this;
         	Liferay.Service(
     			'/dlapp/move-file-entry',
     			{
@@ -279,6 +281,10 @@ YUI.add('rl-content-tree-view', function (A) {
                         	scopeGroupId: this.repository
                         }
                     )
+    			}, function (file) {
+    				if (self.checkedArray && self.checkedArray.length > 1) {
+        				target.appendChild(entry);
+    				}
     			}
         	);
         },
