@@ -79,6 +79,8 @@ YUI.add('rl-content-tree-view', function (A) {
         	this.defaultArticleImage = this.get('defaultArticleImage');
         	this.mouseIsDown = false;
         	this.checkedArray = [];
+        	this.loadingMaskMove;
+        	this.q = null;
         	
         	var folderId = this.get('rootFolderId');
         	var folderLabel = this.get('rootFolderLabel');
@@ -89,7 +91,7 @@ YUI.add('rl-content-tree-view', function (A) {
         	var boundingBoxId = this.ns + this.get('treeBox');
         	var hiddenBoundingBoxId = boundingBoxId + 'HiddenFields';
         	var previewBoundingBoxId = boundingBoxId + 'Preview';
-        	
+
         	A.one('#'+this.ns+ENTRIES_CONTAINER).append('<div id="'+previewBoundingBoxId+'" class="rl-tree-preview"></div>');
         	A.one('#'+this.ns+ENTRIES_CONTAINER).append('<div id="'+boundingBoxId+'"></div>');
         	A.one('#'+this.ns+ENTRIES_CONTAINER).append('<div id="'+hiddenBoundingBoxId+'"></div>');
@@ -142,6 +144,12 @@ YUI.add('rl-content-tree-view', function (A) {
         	
             // compiles template
             this.compiledItemSelectorTemplate = A.Handlebars.compile(itemSelectorTemplate);
+            
+            // loading mask when moving multiple entries
+            this.loadingMaskMove = new A.LoadingMask({
+        	   'strings.loading' : 'Testing Moving Files',
+        		target: A.one('#'+this.ns+ENTRIES_CONTAINER)
+            });
         },
        
         
@@ -176,25 +184,42 @@ YUI.add('rl-content-tree-view', function (A) {
         
         _dropHitHandler: function(event) {
         	var self = this;
+            
         	// only move the element(s) when appending to a folder
         	if (self.contentTree.dropAction === APPEND) {
         		var dropNode = event.drop.get(NODE).get(PARENT_NODE);
 	        	var dropTreeNode = dropNode.getData(TREE_NODE);
 	        	if (self.checkedArray.length && self.checkedArray.length > 1) {
+	        		// create async queue
+	                self.q = new A.AsyncQueue();
 	        		for (var i = 0; i < self.checkedArray.length; i++) {
 	        			var dragNode = A.one("#" + self.checkedArray[i]);
 	        			
 	        			if (dragNode) {
 	        				var dragTreeNode = dragNode.getData(TREE_NODE);
-		        			
-		        			self._moveSingleElement(dragTreeNode, dropTreeNode);
-		    	            
-		    	            // move append child to callback function of move
-		    	            //dropTreeNode.appendChild(dragTreeNode);
+		        			// add a callback for every element being moved
+	        				self.q.add({
+	        					fn: self._moveSingleElement.bind(self), // fn to trigger
+	        					args: [dragTreeNode, dropTreeNode, dragTreeNode.get(PARENT_NODE)] // arguments: the third arg is needed
+	        					// because the AUI TreeView's _afterDropHit is excecuted before the async queue. Since this args are passed
+	        					// by reference, the AUI _afterDropHit changes the parent, creating inconsistency in _moveContentNode.
+	        				});
+
 		    	            self._toggleCheckBox(self.checkedArray[i]);
-	        			}
-		        			
+	        			}	
 	        		}
+	        		
+	        		// finall callback, when moving all elements is done
+	        		self.q.add(function () {
+	        			// hide the loading mask
+	        			this.loadingMaskMove.hide();
+	        		}.bind(self)); // bind the 'this' object to this callback
+	        		
+	        		// Starting async queue, first show the loading mask
+	        		self.loadingMaskMove.show();
+	        		// Run the async queue
+	        		self.q.run();
+	        		
 	        	} else {
 	        		var dragNode = event.drag.get(NODE).get(PARENT_NODE);
 	        		var dragTreeNode = dragNode.getData(TREE_NODE);
@@ -203,12 +228,13 @@ YUI.add('rl-content-tree-view', function (A) {
         	}
         },
         
-        _moveSingleElement: function(dragTreeNode, dropTreeNode) {
+        _moveSingleElement: function(dragTreeNode, dropTreeNode, dragParentNode) {
             if (!(dropTreeNode instanceof A.TreeNode)) {
                 event.preventDefault();
             }
             else{
-            	this._moveContentNode(dragTreeNode,dropTreeNode);
+            	
+            	this._moveContentNode(dragTreeNode, dropTreeNode, dragParentNode);
             }
         },
         
@@ -223,11 +249,13 @@ YUI.add('rl-content-tree-view', function (A) {
         	}
         },       
         
-        _moveContentNode: function(node, target){
+        _moveContentNode: function(node, target, dragParentNode){
         	if (!this._isFolder(target)){
         		target = target.get(PARENT_NODE);
         	}
-        	var parentNode = node.get(PARENT_NODE);
+        	
+        	// use dragParentNode if provided, if not get it from the element being moved.
+        	var parentNode = dragParentNode || node.get(PARENT_NODE);
         	if (parentNode.get(NODE_ATTR_ID) != target.get(NODE_ATTR_ID)){
         		if (this._isDLTarget()){
         			this._moveDLContentNode(node, target);
@@ -280,6 +308,13 @@ YUI.add('rl-content-tree-view', function (A) {
         
         _moveDLFileEntry: function(entry, target) {
         	var self = this;
+        	
+        	// if there's an async queue set
+        	if (self.q) {
+        		// pause it, until the move service is done
+        		self.q.pause();
+        	}
+        	
         	Liferay.Service(
     			'/dlapp/move-file-entry',
     			{
@@ -292,9 +327,14 @@ YUI.add('rl-content-tree-view', function (A) {
                         }
                     )
     			}, function (file) {
+    				// if multiple elements are being moved
     				if (self.checkedArray && self.checkedArray.length > 1) {
+    					// remove it from it's old folder
     					self.contentRoot.removeChild(entry);
+    					// add it to its new target
     					target.appendChild(entry);
+    					// move service is done, resume the async queue
+        				self.q.run();
     				}
     			}
         	);
@@ -719,5 +759,5 @@ YUI.add('rl-content-tree-view', function (A) {
     });
  
 }, '1.0.0', {
-    requires: ['aui-tree-view','json','liferay-portlet-url','handlebars', 'liferay-preview']
+    requires: ['aui-tree-view','json','liferay-portlet-url','handlebars', 'liferay-preview', 'aui-loading-mask-deprecated', 'async-queue']
 });
