@@ -184,47 +184,56 @@ YUI.add('rl-content-tree-view', function (A) {
         
         _dropHitHandler: function(event) {
         	var self = this;
+        	var dropNode, dragNode;
+        	var dropTreeNode, dragTreeNode;
             
-        	// only move the element(s) when appending to a folder
+        	// get the dropNode according the action
         	if (self.contentTree.dropAction === APPEND) {
-        		var dropNode = event.drop.get(NODE).get(PARENT_NODE);
-	        	var dropTreeNode = dropNode.getData(TREE_NODE);
-	        	if (self.checkedArray.length && self.checkedArray.length > 1) {
-	        		// create async queue
-	                self.q = new A.AsyncQueue();
-	        		for (var i = 0; i < self.checkedArray.length; i++) {
-	        			var dragNode = A.one("#" + self.checkedArray[i]);
-	        			
-	        			if (dragNode) {
-	        				var dragTreeNode = dragNode.getData(TREE_NODE);
-		        			// add a callback for every element being moved
-	        				self.q.add({
-	        					fn: self._moveSingleElement.bind(self), // fn to trigger
-	        					args: [dragTreeNode, dropTreeNode, dragTreeNode.get(PARENT_NODE)] // arguments: the third arg is needed
-	        					// because the AUI TreeView's _afterDropHit is excecuted before the async queue. Since this args are passed
-	        					// by reference, the AUI _afterDropHit changes the parent, creating inconsistency in _moveContentNode.
-	        				});
-
-		    	            self._toggleCheckBox(self.checkedArray[i]);
-	        			}	
-	        		}
-	        		
-	        		// finall callback, when moving all elements is done
-	        		self.q.add(function () {
-	        			// hide the loading mask
-	        			this.loadingMaskMove.hide();
-	        		}.bind(self)); // bind the 'this' object to this callback
-	        		
-	        		// Starting async queue, first show the loading mask
-	        		self.loadingMaskMove.show();
-	        		// Run the async queue
-	        		self.q.run();
-	        		
-	        	} else {
-	        		var dragNode = event.drag.get(NODE).get(PARENT_NODE);
-	        		var dragTreeNode = dragNode.getData(TREE_NODE);
-		            self._moveSingleElement(dragTreeNode, dropTreeNode);
-	        	}
+        		// when appending, the drop node is the target drop element
+        		dropNode = event.drop.get(NODE).get(PARENT_NODE);
+	        	dropTreeNode = dropNode.getData(TREE_NODE);
+        	} else { 
+        		// when inserting above or below, the parent is the parent of the drop element
+        		dropNode = event.drop.get(NODE).get(PARENT_NODE);
+        		// 'the parent of the parent' can be found by querying the closest 'li' of the drop element
+        		dropNode = dropNode.ancestor('li');
+        		dropTreeNode = dropNode.getData(TREE_NODE);
+        	}
+        	
+        	// moving multiple elements
+        	if (self.checkedArray.length && self.checkedArray.length > 1) {
+        		// create async queue
+                self.q = new A.AsyncQueue();
+        		for (var i = 0; i < self.checkedArray.length; i++) {
+        			dragNode = A.one("#" + self.checkedArray[i]);
+        			
+        			if (dragNode) {
+        				dragTreeNode = dragNode.getData(TREE_NODE);
+	        			// add a callback for every element being moved
+        				self.q.add({
+        					fn: self._moveSingleElement.bind(self), // fn to trigger
+        					args: [dragTreeNode, dropTreeNode, dragTreeNode.get(PARENT_NODE)] // arguments: the third arg is needed
+        					// because the AUI TreeView's _afterDropHit is excecuted before the async queue. Since this args are passed
+        					// by reference, the AUI _afterDropHit changes the parent, creating inconsistency in _moveContentNode.
+        				});
+        			}	
+        		}
+        		
+        		// finall callback, when moving all elements is done
+        		self.q.add(function () {
+        			// hide the loading mask
+        			this.loadingMaskMove.hide();
+        		}.bind(self)); // bind the 'this' object to this callback
+        		
+        		// Starting async queue, first show the loading mask
+        		self.loadingMaskMove.show();
+        		// Run the async queue
+        		self.q.run();
+        		
+        	} else { // moving single element
+        		dragNode = event.drag.get(NODE).get(PARENT_NODE);
+        		dragTreeNode = dragNode.getData(TREE_NODE);
+	            self._moveSingleElement(dragTreeNode, dropTreeNode);
         	}
         },
         
@@ -233,7 +242,6 @@ YUI.add('rl-content-tree-view', function (A) {
                 event.preventDefault();
             }
             else{
-            	
             	this._moveContentNode(dragTreeNode, dropTreeNode, dragParentNode);
             }
         },
