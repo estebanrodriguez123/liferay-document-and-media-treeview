@@ -147,7 +147,7 @@ YUI.add('rl-content-tree-view', function (A) {
             
             // loading mask when moving multiple entries
             this.loadingMaskMove = new A.LoadingMask({
-        	   'strings.loading' : 'Testing Moving Files',
+        	   'strings.loading' : 'Moving Files',
         		target: A.one('#'+this.ns+ENTRIES_CONTAINER)
             });
         },
