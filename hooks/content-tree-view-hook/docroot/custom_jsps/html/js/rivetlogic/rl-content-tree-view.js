@@ -175,11 +175,18 @@ YUI.add('rl-content-tree-view', function (A) {
         },
         
         _dragStartHandler: function(event) {
-        	// override the helper label when moving multiple elements
-        	if (this.checkedArray.length && this.checkedArray.length > 1) {
-        		var helperLabel = A.one(TOOLTIP_HELPER_LABEL);
-            	helperLabel.html('Move ' + this.checkedArray.length + ' elements');
+        	var dragNode = event.target.get(NODE);
+        	// if the dragging node was checked
+        	if (dragNode.hasClass('tree-node-checked')) {
+        		// override the helper label when moving multiple elements
+	        	if (this.checkedArray.length && this.checkedArray.length > 1) {
+	        		var helperLabel = A.one(TOOLTIP_HELPER_LABEL);
+	            	helperLabel.html('Move ' + this.checkedArray.length + ' elements');
+	        	}
+        	} else { // the dragging node was not checked, reset checked array 
+        		this._resetCheckedArray();
         	}
+	        	
         },
         
         _dropHitHandler: function(event) {
@@ -298,7 +305,15 @@ YUI.add('rl-content-tree-view', function (A) {
         	}     	        	
         },
         
-        _moveDLFolder: function(folder, target){
+        _moveDLFolder: function(folder, target) {
+        	var self = this;
+        	
+        	// if there's an async queue set
+        	if (self.q) {
+        		// pause it, until the move service is done
+        		self.q.pause();
+        	}
+        	
         	Liferay.Service(
     			'/dlapp/move-folder',
     			{
@@ -310,6 +325,16 @@ YUI.add('rl-content-tree-view', function (A) {
                         	scopeGroupId: this.repository
                         }
                     )
+    			} , function (file) {
+    				// if multiple elements are being moved
+    				if (self.checkedArray && self.checkedArray.length > 1) {
+    					// remove it from it's old folder
+    					self.contentRoot.removeChild(folder);
+    					// add it to its new target
+    					target.appendChild(folder);
+    					// move service is done, resume the async queue
+        				self.q.run();
+    				}
     			}
         	);
         },
@@ -468,20 +493,49 @@ YUI.add('rl-content-tree-view', function (A) {
         },
         
         _clickCheckBox: function(event){
-        	var selectedNodeId = event.currentTarget.attr(NODE_ATTR_ID);
+        	var node = event.currentTarget;
+        	var selectedNodeId = node.attr(NODE_ATTR_ID);
+        	var treeNode = node.getData(TREE_NODE);
         	
-        	// search for the id in the array
-        	var index = this.checkedArray.indexOf(selectedNodeId);
-        	
-        	// add the nodeId to the checked array
-        	if (index > -1) {
-        		this.checkedArray.splice(index, 1);
-        	} else {
-        		this.checkedArray.push(selectedNodeId);
-        	}
+        	// update the checked elements array
+        	this._updateCheckedArray(selectedNodeId);
         	
         	// trigger the event to simulate the click on the checkbox (toggle toolbar additional options).
         	this._toggleCheckBox(selectedNodeId);
+        	
+        	if (this._isFolder(treeNode)) {
+    			this._toggleChildren(treeNode.getChildren());
+    		} else {
+    			
+    		}
+        },
+        
+        _toggleChildren: function (children) {
+        	var self = this;
+        	if (children) {
+        		children.forEach(function (child) {
+        			var nodeChild = child.get(BOUNDING_BOX);
+        			var nodeChildId = nodeChild.get(NODE_ATTR_ID);
+        			
+        			// ui toggle checkbox depending on parent status
+        			if (child.get(PARENT_NODE).isChecked()) {
+        				child.check();
+        			} else {
+        				child.uncheck();
+        			}
+        			
+        			// checkbox state toggle
+        			self._toggleCheckBox(nodeChildId);
+        			
+        			// update the checked elements array
+        			self._updateCheckedArray(nodeChildId);
+        			// recursively toggle children
+        			var childArr = child.getChildren();
+        			if (childArr) {
+        				self._toggleChildren(childArr);
+        			}
+        		})
+        	} 
         },
         
         _toggleCheckBox: function (nodeId) {
@@ -491,7 +545,26 @@ YUI.add('rl-content-tree-view', function (A) {
         	}
         },
         
+        _updateCheckedArray: function (selectedNodeId) {
+        	// search for the id in the array
+        	var index = this.checkedArray.indexOf(selectedNodeId);
+        	
+        	// add the nodeId to the checked array
+        	if (index > -1) {
+        		this.checkedArray.splice(index, 1);
+        	} else {
+        		this.checkedArray.push(selectedNodeId);
+        	}
+        },
+        
         _resetCheckedArray: function () {
+        	var self = this;
+        	var tree = A.one('#' + this.ns + ENTRIES_CONTAINER);
+        	this.checkedArray.forEach( function(id) {
+        		var childDOM = tree.one('#' + id);
+        		childDOM.getData(TREE_NODE).uncheck();
+    			self._toggleCheckBox(id);
+        	})
         	this.checkedArray.splice(0, this.checkedArray.length);
         },
                
