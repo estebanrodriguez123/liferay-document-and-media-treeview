@@ -500,7 +500,7 @@ YUI.add('rl-content-tree-view', function (A) {
         	var treeNode = node.getData(TREE_NODE);
         	
         	// update the checked elements array
-        	this._updateCheckedArray(selectedNodeId);
+        	this._toggleCheckedArray(selectedNodeId);
         	
         	// trigger the event to simulate the click on the checkbox (toggle toolbar additional options).
         	this._toggleCheckBox(selectedNodeId);
@@ -526,7 +526,7 @@ YUI.add('rl-content-tree-view', function (A) {
 	        		var parentNodeId = parentNode.get(NODE_ATTR_ID)
 	        		parentNode.uncheck();
 	        		this._toggleCheckBox(parentNodeId);
-	        		this._updateCheckedArray(parentNodeId);
+	        		this._toggleCheckedArray(parentNodeId);
 	        		// repeat with all parents
 	        		this._toggleEntries(parentNode);
 	        	}
@@ -539,19 +539,22 @@ YUI.add('rl-content-tree-view', function (A) {
         		children.forEach(function (child) {
         			var nodeChild = child.get(BOUNDING_BOX);
         			var nodeChildId = nodeChild.get(NODE_ATTR_ID);
+                    var isParentChecked = child.get(PARENT_NODE).isChecked();
         			
         			// ui toggle checkbox depending on parent status
-        			if (child.get(PARENT_NODE).isChecked()) {
+        			if (isParentChecked) {
         				child.check();
+                        
         			} else {
         				child.uncheck();
         			}
+
+                    // add or remove the element of the array, depending on the status of its parent
+                    self._setElementCheckedArray(nodeChildId, isParentChecked);
         			
         			// checkbox state toggle
         			self._toggleCheckBox(nodeChildId);
-        			
-        			// update the checked elements array
-        			self._updateCheckedArray(nodeChildId);
+
         			// recursively toggle children
         			var childArr = child.getChildren();
         			if (childArr) {
@@ -568,7 +571,7 @@ YUI.add('rl-content-tree-view', function (A) {
         	}
         },
         
-        _updateCheckedArray: function (selectedNodeId) {
+        _toggleCheckedArray: function (selectedNodeId) {
         	// search for the id in the array
         	var index = this.checkedArray.indexOf(selectedNodeId);
         	
@@ -589,6 +592,20 @@ YUI.add('rl-content-tree-view', function (A) {
     			self._toggleCheckBox(id);
         	})
         	this.checkedArray.splice(0, this.checkedArray.length);
+        },
+
+        _setElementCheckedArray: function (id, check) {
+            var index = this.checkedArray.indexOf(id);
+            // if the item was checked and it's not in the array, add it
+            if (check) {
+                if(index === -1) {
+                    this.checkedArray.push(id);
+                }
+            } else { // if the item was unchecked and it is in the array, remove it
+                if(index > -1) {
+                    this.checkedArray.splice(index, 1);
+                }
+            }
         },
                
         _clickHitArea: function(event){
