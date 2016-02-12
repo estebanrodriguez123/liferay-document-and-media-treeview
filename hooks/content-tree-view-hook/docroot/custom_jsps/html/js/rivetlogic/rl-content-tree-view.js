@@ -505,11 +505,32 @@ YUI.add('rl-content-tree-view', function (A) {
         	// trigger the event to simulate the click on the checkbox (toggle toolbar additional options).
         	this._toggleCheckBox(selectedNodeId);
         	
+        	// if the clicked checkbox is a folder
         	if (this._isFolder(treeNode)) {
+        		// toggle its children 
     			this._toggleChildren(treeNode.getChildren());
-    		} else {
-    			
+    		} else { // not a folder
+    			// toggle its parent folder recursively
+    			this._toggleEntries(treeNode);
     		}
+        },
+        
+        _toggleEntries: function (treeNode) {
+        	// get the parent node
+        	var parentNode = treeNode.get(PARENT_NODE);
+        	// when the entry is unchecked, all its parents must be unchecked
+        	if (typeof treeNode.isChecked === 'function' && !treeNode.isChecked()) {
+        		// since the entry is unchecked, verify that the parent node is checked
+        		if (typeof parentNode.isChecked === 'function' && parentNode.isChecked()) {
+        			// parent node is checked, uncheck it
+	        		var parentNodeId = parentNode.get(NODE_ATTR_ID)
+	        		parentNode.uncheck();
+	        		this._toggleCheckBox(parentNodeId);
+	        		this._updateCheckedArray(parentNodeId);
+	        		// repeat with all parents
+	        		this._toggleEntries(parentNode);
+	        	}
+        	}
         },
         
         _toggleChildren: function (children) {
