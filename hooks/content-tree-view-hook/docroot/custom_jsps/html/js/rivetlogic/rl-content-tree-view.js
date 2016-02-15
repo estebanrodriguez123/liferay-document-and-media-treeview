@@ -588,7 +588,7 @@ YUI.add('rl-content-tree-view', function (A) {
                     self._setElementCheckedArray(nodeChildId, isParentChecked);
         			
         			// checkbox state toggle
-        			self._toggleCheckBox(nodeChildId);
+        			self._toggleCheckBox(nodeChildId, isParentChecked);
 
         			// recursively toggle children
         			var childArr = child.getChildren();
@@ -599,10 +599,17 @@ YUI.add('rl-content-tree-view', function (A) {
         	} 
         },
         
-        _toggleCheckBox: function (nodeId) {
+        _toggleCheckBox: function (nodeId, isParentChecked) {
         	var relatedCheckbox = this.hiddenFieldsBox.one('[type=checkbox][value='+nodeId+']');
         	if (relatedCheckbox !== null) {
-        		relatedCheckbox.simulate('click');
+        		// already checked
+	        	if (relatedCheckbox.attr("checked")) {
+	        		if (!isParentChecked) {
+	        			relatedCheckbox.simulate('click');
+	        		}
+	        	} else {
+	        		relatedCheckbox.simulate('click');
+	        	}
         	}
         },
         
