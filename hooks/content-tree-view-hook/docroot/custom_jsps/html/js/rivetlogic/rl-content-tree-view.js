@@ -50,6 +50,8 @@ YUI.add('rl-content-tree-view', function (A) {
 	var REG_EXP_GLOBAL = 'g';
 	var SHORTCUT_LABEL = 'shortcut-tree-node-label';
 	var TOOLTIP_HELPER_PROPERTY = 'helper';
+	var TOOLTIP_HELPER_LABEL = '.tree-drag-helper-label';
+	var APPEND = "append";
 	 
     A.Rivet.ContentTreeView = A.Base.create('rl-content-tree-view',A.Base, [], {
 
@@ -76,6 +78,9 @@ YUI.add('rl-content-tree-view', function (A) {
         	this.defaultDocumentImagePath = this.get('defaultDocumentImagePath');
         	this.defaultArticleImage = this.get('defaultArticleImage');
         	this.mouseIsDown = false;
+        	this.checkedArray = [];
+        	this.loadingMaskMove;
+        	this.q = null;
         	
         	var folderId = this.get('rootFolderId');
         	var folderLabel = this.get('rootFolderLabel');
@@ -86,7 +91,7 @@ YUI.add('rl-content-tree-view', function (A) {
         	var boundingBoxId = this.ns + this.get('treeBox');
         	var hiddenBoundingBoxId = boundingBoxId + 'HiddenFields';
         	var previewBoundingBoxId = boundingBoxId + 'Preview';
-        	
+
         	A.one('#'+this.ns+ENTRIES_CONTAINER).append('<div id="'+previewBoundingBoxId+'" class="rl-tree-preview"></div>');
         	A.one('#'+this.ns+ENTRIES_CONTAINER).append('<div id="'+boundingBoxId+'"></div>');
         	A.one('#'+this.ns+ENTRIES_CONTAINER).append('<div id="'+hiddenBoundingBoxId+'"></div>');
@@ -110,6 +115,7 @@ YUI.add('rl-content-tree-view', function (A) {
         		       	],
         		       	after: {
         		       		'drop:hit': A.bind(instance._afterDropHitHandler,this),
+        		       		'drag:start': A.bind(instance._dragStartHandler, this)
         		       	},
         		       	on: {
         		       		'drop:hit': A.bind(instance._dropHitHandler,this)
@@ -138,6 +144,12 @@ YUI.add('rl-content-tree-view', function (A) {
         	
             // compiles template
             this.compiledItemSelectorTemplate = A.Handlebars.compile(itemSelectorTemplate);
+            
+            // loading mask when moving multiple entries
+            this.loadingMaskMove = new A.LoadingMask({
+        	   'strings.loading' : 'Moving Files',
+        		target: A.one('#'+this.ns+ENTRIES_CONTAINER)
+            });
         },
        
         
@@ -162,33 +174,105 @@ YUI.add('rl-content-tree-view', function (A) {
         	return (this.treeTarget === A.Rivet.TreeTargetDL);
         },
         
-        _dropHitHandler: function(event){        	
-        	var dragNode = event.drag.get(NODE).get(PARENT_NODE);
-            var dragTreeNode = dragNode.getData(TREE_NODE);
-            var dropNode = event.drop.get(NODE).get(PARENT_NODE);
-            var dropTreeNode = dropNode.getData(TREE_NODE);          
-            if (!(dropTreeNode instanceof A.TreeNode)) {
-                event.preventDefault();
-            }
-            else{
-            	this._moveContentNode(dragTreeNode,dropTreeNode);
+        _dragStartHandler: function(event) {
+        	var dragNode = event.target.get(NODE);
+        	// if the dragging node was checked
+        	if (dragNode.hasClass('tree-node-checked')) {
+        		// override the helper label when moving multiple elements
+	        	if (this.checkedArray.length && this.checkedArray.length > 1) {
+	        		var helperLabel = A.one(TOOLTIP_HELPER_LABEL);
+	            	helperLabel.html('Move ' + this.checkedArray.length + ' elements');
+	        	}
+        	} else { // the dragging node was not checked, reset checked array 
+        		this._resetCheckedArray();
+        	}
+        },
+        
+        _dropHitHandler: function(event) {
+        	var self = this;
+        	var dropNode, dragNode;
+        	var dropTreeNode, dragTreeNode;
+            
+        	// get the dropNode according the action
+        	if (self.contentTree.dropAction === APPEND) {
+        		// when appending, the drop node is the target drop element
+        		dropNode = event.drop.get(NODE).get(PARENT_NODE);
+	        	dropTreeNode = dropNode.getData(TREE_NODE);
+        	} else { 
+        		// when inserting above or below, the parent is the parent of the drop element
+        		dropNode = event.drop.get(NODE).get(PARENT_NODE);
+        		// 'the parent of the parent' can be found by querying the closest 'li' of the drop element
+        		dropNode = dropNode.ancestor('li');
+        		dropTreeNode = dropNode.getData(TREE_NODE);
+        	}
+        	
+        	if (!(dropTreeNode instanceof A.TreeNode)) {
+        		event.preventDefault();
+        	} else {
+        		// moving multiple elements
+	        	if (self.checkedArray.length && self.checkedArray.length > 1) {
+	        		// create async queue
+	                self.q = new A.AsyncQueue();
+	        		for (var i = 0; i < self.checkedArray.length; i++) {
+	        			dragNode = A.one("#" + self.checkedArray[i]);
+	        			
+	        			if (dragNode) {
+	        				dragTreeNode = dragNode.getData(TREE_NODE);
+		        			// add a callback for every element being moved
+	        				self.q.add({
+	        					fn: self._moveSingleElement.bind(self), // fn to trigger
+	        					args: [dragTreeNode, dropTreeNode, dragTreeNode.get(PARENT_NODE)] // arguments: the third arg is needed
+	        					// because the AUI TreeView's _afterDropHit is excecuted before the async queue. Since this args are passed
+	        					// by reference, the AUI _afterDropHit changes the parent, creating inconsistency in _moveContentNode.
+	        				});
+	        			}	
+	        		}
+	        		
+	        		// finall callback, when moving all elements is done
+	        		self.q.add(function () {
+	        			// hide the loading mask
+	        			this.loadingMaskMove.hide();
+	        		}.bind(self)); // bind the 'this' object to this callback
+	        		
+	        		// Starting async queue, first show the loading mask
+	        		self.loadingMaskMove.show();
+	        		// Run the async queue
+	        		self.q.run();
+	        		
+	        	} else { // moving single element
+	        		dragNode = event.drag.get(NODE).get(PARENT_NODE);
+	        		dragTreeNode = dragNode.getData(TREE_NODE);
+		            self._moveSingleElement(dragTreeNode, dropTreeNode);
+	        	}
+        	}
+        },
+        
+        _moveSingleElement: function(dragTreeNode, dropTreeNode, dragParentNode) {
+        	// if the parent's element is checked, don't move it. By moving the parent, the children
+        	// are moved automatically, so it's not needed.
+            if (!(this._isChecked(dragParentNode))) {
+            	this._moveContentNode(dragTreeNode, dropTreeNode, dragParentNode);
             }
         },
         
-        _afterDropHitHandler: function(event){     	
-            var dropNode = event.drop.get(NODE).get(PARENT_NODE);
-            var dropTreeNode = dropNode.getData(TREE_NODE);
-        	if (!(this._isFullLoaded(dropTreeNode))){
-        		dropTreeNode.empty();
-    			this._getChildren(dropTreeNode, this);
-    		}
+        _afterDropHitHandler: function(event) {
+        	if (this.contentTree.dropAction === APPEND) {
+        		var dropNode = event.drop.get(NODE).get(PARENT_NODE);
+	            var dropTreeNode = dropNode.getData(TREE_NODE);
+	        	if (!(this._isFullLoaded(dropTreeNode))){
+	        		dropTreeNode.empty();
+	    			this._getChildren(dropTreeNode, this);
+	    		}
+        	}
         },       
         
-        _moveContentNode: function(node, target){
+        _moveContentNode: function(node, target, dragParentNode){
         	if (!this._isFolder(target)){
         		target = target.get(PARENT_NODE);
         	}
-        	var parentNode = node.get(PARENT_NODE);
+        	
+        	// use dragParentNode if provided, if not get it from the element being moved.
+        	var parentNode = dragParentNode || node.get(PARENT_NODE);
         	if (parentNode.get(NODE_ATTR_ID) != target.get(NODE_ATTR_ID)){
         		if (this._isDLTarget()){
         			this._moveDLContentNode(node, target);
@@ -223,7 +307,15 @@ YUI.add('rl-content-tree-view', function (A) {
         	}     	        	
         },
         
-        _moveDLFolder: function(folder, target){
+        _moveDLFolder: function(folder, target) {
+        	var self = this;
+        	
+        	// if there's an async queue set
+        	if (self.q) {
+        		// pause it, until the move service is done
+        		self.q.pause();
+        	}
+        	
         	Liferay.Service(
     			'/dlapp/move-folder',
     			{
@@ -235,11 +327,29 @@ YUI.add('rl-content-tree-view', function (A) {
                         	scopeGroupId: this.repository
                         }
                     )
+    			} , function (file) {
+    				// if multiple elements are being moved
+    				if (self.checkedArray && self.checkedArray.length > 1) {
+    					// remove it from it's old folder
+    					self.contentRoot.removeChild(folder);
+    					// add it to its new target
+    					target.appendChild(folder);
+    					// move service is done, resume the async queue
+        				self.q.run();
+    				}
     			}
         	);
         },
         
-        _moveDLFileEntry: function(entry, target){        	
+        _moveDLFileEntry: function(entry, target) {
+        	var self = this;
+        	
+        	// if there's an async queue set
+        	if (self.q) {
+        		// pause it, until the move service is done
+        		self.q.pause();
+        	}
+        	
         	Liferay.Service(
     			'/dlapp/move-file-entry',
     			{
@@ -251,11 +361,26 @@ YUI.add('rl-content-tree-view', function (A) {
                         	scopeGroupId: this.repository
                         }
                     )
+    			}, function (file) {
+    				// if multiple elements are being moved
+    				if (self.checkedArray && self.checkedArray.length > 1) {
+    					// remove it from it's old folder
+    					self.contentRoot.removeChild(entry);
+    					// add it to its new target
+    					target.appendChild(entry);
+    					// move service is done, resume the async queue
+        				self.q.run();
+    				}
     			}
         	);
         },
         
-        _moveDLFileShortcut: function(entry, target){        	
+        _moveDLFileShortcut: function(entry, target) {
+			 var self = this;
+			
+			 if (self.q) {
+				self.q.pause();
+			 }
         	 Liferay.Service(
            		 '/dlapp/update-file-shortcut',
            		 {
@@ -267,11 +392,23 @@ YUI.add('rl-content-tree-view', function (A) {
                         	scopeGroupId: this.repository
                         }
                     )
+           		 }, function (file) {
+           			if (self.checkedArray && self.checkedArray.length > 1) {
+    					self.contentRoot.removeChild(entry);
+    					target.appendChild(entry);
+        				self.q.run();
+    				}
            		 }
        		);
         },
         
-        _moveJournalFolder: function(folder, target){
+        _moveJournalFolder: function(folder, target) {
+        	var self = this;
+        	
+        	if (self.q) {
+        		self.q.pause();
+        	}
+        	
         	Liferay.Service(
     			'/journalfolder/move-folder',
     			{
@@ -282,17 +419,35 @@ YUI.add('rl-content-tree-view', function (A) {
                         	scopeGroupId: this.scopeGroupId
                         }
                     )
+    			}, function (file) {
+    				if (self.checkedArray && self.checkedArray.length > 1) {
+    					self.contentRoot.removeChild(folder);
+    					target.appendChild(folder);
+        				self.q.run();
+    				}
     			}
         	);
         },
         
-        _moveJournalArticle: function(entry, target){        	
+        _moveJournalArticle: function(entry, target) {
+        	var self = this;
+        	
+        	if (self.q) {
+        		self.q.pause();
+        	}
+        	
         	Liferay.Service(
     			'/journalarticle/move-article',
     			{
     				groupId: this.scopeGroupId,        				
     				articleId: entry.get(NODE_ATTR_ID),
     				newFolderId: target.get(NODE_ATTR_ID)
+    			}, function(file) {
+    				if (self.checkedArray && self.checkedArray.length > 1) {
+    					self.contentRoot.removeChild(entry);
+    					target.appendChild(entry);
+        				self.q.run();
+    				}
     			}
         	);
         },
@@ -375,12 +530,124 @@ YUI.add('rl-content-tree-view', function (A) {
         },
         
         _clickCheckBox: function(event){
-        	var selectedNodeId = event.currentTarget.attr(NODE_ATTR_ID);
-        	var relatedCheckbox = this.hiddenFieldsBox.one('[type=checkbox][value='+selectedNodeId+']');        	
-        	if (relatedCheckbox !== null){
-        		relatedCheckbox.simulate("click");
+        	var node = event.currentTarget;
+        	var selectedNodeId = node.attr(NODE_ATTR_ID);
+        	var treeNode = node.getData(TREE_NODE);
+        	
+        	// update the checked elements array
+        	this._toggleCheckedArray(selectedNodeId);
+        	
+        	// trigger the event to simulate the click on the checkbox (toggle toolbar additional options).
+        	this._toggleCheckBox(selectedNodeId);
+        	
+        	// if the clicked checkbox is a folder
+        	if (this._isFolder(treeNode)) {
+        		// toggle its children 
+    			this._toggleChildren(treeNode.getChildren());
+    		} else { // not a folder
+    			// toggle its parent folder recursively
+    			this._toggleEntries(treeNode);
+    		}
+        },
+        
+        _toggleEntries: function (treeNode) {
+        	// get the parent node
+        	var parentNode = treeNode.get(PARENT_NODE);
+        	// when the entry is unchecked, all its parents must be unchecked
+        	if (typeof treeNode.isChecked === 'function' && !treeNode.isChecked()) {
+        		// since the entry is unchecked, verify that the parent node is checked
+        		if (typeof parentNode.isChecked === 'function' && parentNode.isChecked()) {
+        			// parent node is checked, uncheck it
+	        		var parentNodeId = parentNode.get(NODE_ATTR_ID)
+	        		parentNode.uncheck();
+	        		this._toggleCheckBox(parentNodeId);
+	        		this._toggleCheckedArray(parentNodeId);
+	        		// repeat with all parents
+	        		this._toggleEntries(parentNode);
+	        	}
         	}
-        	 
+        },
+        
+        _toggleChildren: function (children) {
+        	var self = this;
+        	if (children) {
+        		children.forEach(function (child) {
+        			var nodeChild = child.get(BOUNDING_BOX);
+        			var nodeChildId = nodeChild.get(NODE_ATTR_ID);
+                    var isParentChecked = child.get(PARENT_NODE).isChecked();
+        			
+        			// ui toggle checkbox depending on parent status
+        			if (isParentChecked) {
+        				child.check();
+                        
+        			} else {
+        				child.uncheck();
+        			}
+
+                    // add or remove the element of the array, depending on the status of its parent
+                    self._setElementCheckedArray(nodeChildId, isParentChecked);
+        			
+        			// checkbox state toggle
+        			self._toggleCheckBox(nodeChildId, isParentChecked);
+
+        			// recursively toggle children
+        			var childArr = child.getChildren();
+        			if (childArr) {
+        				self._toggleChildren(childArr);
+        			}
+        		})
+        	} 
+        },
+        
+        _toggleCheckBox: function (nodeId, isParentChecked) {
+        	var relatedCheckbox = this.hiddenFieldsBox.one('[type=checkbox][value='+nodeId+']');
+        	if (relatedCheckbox !== null) {
+        		// already checked
+	        	if (relatedCheckbox.attr("checked")) {
+	        		if (!isParentChecked) {
+	        			relatedCheckbox.simulate('click');
+	        		}
+	        	} else {
+	        		relatedCheckbox.simulate('click');
+	        	}
+        	}
+        },
+        
+        _toggleCheckedArray: function (selectedNodeId) {
+        	// search for the id in the array
+        	var index = this.checkedArray.indexOf(selectedNodeId);
+        	
+        	// add the nodeId to the checked array
+        	if (index > -1) {
+        		this.checkedArray.splice(index, 1);
+        	} else {
+        		this.checkedArray.push(selectedNodeId);
+        	}
+        },
+        
+        _resetCheckedArray: function () {
+        	var self = this;
+        	var tree = A.one('#' + this.ns + ENTRIES_CONTAINER);
+        	this.checkedArray.forEach( function(id) {
+        		var childDOM = tree.one('#' + id);
+        		childDOM.getData(TREE_NODE).uncheck();
+    			self._toggleCheckBox(id);
+        	})
+        	this.checkedArray.splice(0, this.checkedArray.length);
+        },
+
+        _setElementCheckedArray: function (id, check) {
+            var index = this.checkedArray.indexOf(id);
+            // if the item was checked and it's not in the array, add it
+            if (check) {
+                if(index === -1) {
+                    this.checkedArray.push(id);
+                }
+            } else { // if the item was unchecked and it is in the array, remove it
+                if(index > -1) {
+                    this.checkedArray.splice(index, 1);
+                }
+            }
         },
                
         _clickHitArea: function(event){
@@ -610,6 +877,14 @@ YUI.add('rl-content-tree-view', function (A) {
         		result = treeNode.get(NODE_ATTR_FULL_LOADED);
         	}
         	return result;
+        },
+        
+        _isChecked: function(treeNode) {
+        	var result = false;
+        	if (treeNode && treeNode.isChecked) {
+        		result = treeNode.isChecked();
+        	}
+        	return result;
         }
     
     }, {
@@ -655,5 +930,5 @@ YUI.add('rl-content-tree-view', function (A) {
     });
  
 }, '1.0.0', {
-    requires: ['aui-tree-view','json','liferay-portlet-url','handlebars', 'liferay-preview']
+    requires: ['aui-tree-view','json','liferay-portlet-url','handlebars', 'liferay-preview', 'aui-loading-mask-deprecated', 'async-queue']
 });
