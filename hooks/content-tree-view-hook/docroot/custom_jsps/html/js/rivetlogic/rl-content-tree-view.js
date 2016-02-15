@@ -375,7 +375,12 @@ YUI.add('rl-content-tree-view', function (A) {
         	);
         },
         
-        _moveDLFileShortcut: function(entry, target){        	
+        _moveDLFileShortcut: function(entry, target) {
+			 var self = this;
+			
+			 if (self.q) {
+				self.q.pause();
+			 }
         	 Liferay.Service(
            		 '/dlapp/update-file-shortcut',
            		 {
@@ -387,11 +392,23 @@ YUI.add('rl-content-tree-view', function (A) {
                         	scopeGroupId: this.repository
                         }
                     )
+           		 }, function (file) {
+           			if (self.checkedArray && self.checkedArray.length > 1) {
+    					self.contentRoot.removeChild(entry);
+    					target.appendChild(entry);
+        				self.q.run();
+    				}
            		 }
        		);
         },
         
-        _moveJournalFolder: function(folder, target){
+        _moveJournalFolder: function(folder, target) {
+        	var self = this;
+        	
+        	if (self.q) {
+        		self.q.pause();
+        	}
+        	
         	Liferay.Service(
     			'/journalfolder/move-folder',
     			{
@@ -402,17 +419,35 @@ YUI.add('rl-content-tree-view', function (A) {
                         	scopeGroupId: this.scopeGroupId
                         }
                     )
+    			}, function (file) {
+    				if (self.checkedArray && self.checkedArray.length > 1) {
+    					self.contentRoot.removeChild(folder);
+    					target.appendChild(folder);
+        				self.q.run();
+    				}
     			}
         	);
         },
         
-        _moveJournalArticle: function(entry, target){        	
+        _moveJournalArticle: function(entry, target) {
+        	var self = this;
+        	
+        	if (self.q) {
+        		self.q.pause();
+        	}
+        	
         	Liferay.Service(
     			'/journalarticle/move-article',
     			{
     				groupId: this.scopeGroupId,        				
     				articleId: entry.get(NODE_ATTR_ID),
     				newFolderId: target.get(NODE_ATTR_ID)
+    			}, function(file) {
+    				if (self.checkedArray && self.checkedArray.length > 1) {
+    					self.contentRoot.removeChild(entry);
+    					target.appendChild(entry);
+        				self.q.run();
+    				}
     			}
         	);
         },
