@@ -81,6 +81,7 @@ YUI.add('rl-content-tree-view', function (A) {
         	this.checkedArray = [];
         	this.loadingMaskMove;
         	this.q = null;
+            this.mouseIsDown = false;
         	
         	var folderId = this.get('rootFolderId');
         	var folderLabel = this.get('rootFolderLabel');
@@ -118,7 +119,9 @@ YUI.add('rl-content-tree-view', function (A) {
         		       		'drag:start': A.bind(instance._dragStartHandler, this)
         		       	},
         		       	on: {
-        		       		'drop:hit': A.bind(instance._dropHitHandler,this)
+        		       		'drop:hit': A.bind(instance._dropHitHandler,this),
+                            'drag:mouseDown': A.bind(instance._mouseDown, this),
+                            'drag:mouseup': A.bind(instance._mouseUp, this)
         		       	}
         		      }
         		    ).render();
@@ -173,8 +176,23 @@ YUI.add('rl-content-tree-view', function (A) {
         _isDLTarget: function(){        	
         	return (this.treeTarget === A.Rivet.TreeTargetDL);
         },
+
+        _mouseDown: function (event) {
+            this.mouseIsDown = true;
+        },
+
+        _mouseUp: function (event) {
+            this.mouseIsDown = false;
+        },
         
         _dragStartHandler: function(event) {
+            var self = this;
+            event.target.after('dragNodeChange', function () {
+                if (!self.mouseIsDown) {
+                    self.contentTree.get(TOOLTIP_HELPER_PROPERTY).hide();
+                }
+            });
+
         	var dragNode = event.target.get(NODE);
         	// if the dragging node was checked
         	if (dragNode.hasClass('tree-node-checked')) {
@@ -232,6 +250,8 @@ YUI.add('rl-content-tree-view', function (A) {
 	        		self.q.add(function () {
 	        			// hide the loading mask
 	        			this.loadingMaskMove.hide();
+                        // hide the helper
+                        this.contentTree.get(TOOLTIP_HELPER_PROPERTY).hide();
 	        		}.bind(self)); // bind the 'this' object to this callback
 	        		
 	        		// Starting async queue, first show the loading mask
@@ -281,6 +301,13 @@ YUI.add('rl-content-tree-view', function (A) {
         			this._moveJournalContentNode(node, target);
         		}
         	}
+
+            boundingBox = this.contentTree.get(BOUNDING_BOX);
+            boundingBox.detach('click');
+            boundingBox.detach('mouseover');
+            boundingBox.delegate('click', A.bind(this._clickHandler,this), NODE_SELECTOR); 
+            boundingBox.delegate('mouseover', A.bind(this._mouseOverHandler,this), NODE_SELECTOR); 
+            this.contentTree.bindUI(); 
         },
         
         _moveDLContentNode: function(node, target){
@@ -328,15 +355,7 @@ YUI.add('rl-content-tree-view', function (A) {
                         }
                     )
     			} , function (file) {
-    				// if multiple elements are being moved
-    				if (self.checkedArray && self.checkedArray.length > 1) {
-    					// remove it from it's old folder
-    					self.contentRoot.removeChild(folder);
-    					// add it to its new target
-    					target.appendChild(folder);
-    					// move service is done, resume the async queue
-        				self.q.run();
-    				}
+                    self._moveServiceHandler.apply(self, [folder, target]);
     			}
         	);
         },
@@ -362,15 +381,7 @@ YUI.add('rl-content-tree-view', function (A) {
                         }
                     )
     			}, function (file) {
-    				// if multiple elements are being moved
-    				if (self.checkedArray && self.checkedArray.length > 1) {
-    					// remove it from it's old folder
-    					self.contentRoot.removeChild(entry);
-    					// add it to its new target
-    					target.appendChild(entry);
-    					// move service is done, resume the async queue
-        				self.q.run();
-    				}
+    				self._moveServiceHandler.apply(self, [entry, target]);
     			}
         	);
         },
@@ -393,11 +404,7 @@ YUI.add('rl-content-tree-view', function (A) {
                         }
                     )
            		 }, function (file) {
-           			if (self.checkedArray && self.checkedArray.length > 1) {
-    					self.contentRoot.removeChild(entry);
-    					target.appendChild(entry);
-        				self.q.run();
-    				}
+           			self._moveServiceHandler.apply(self, [entry, target]);
            		 }
        		);
         },
@@ -420,11 +427,7 @@ YUI.add('rl-content-tree-view', function (A) {
                         }
                     )
     			}, function (file) {
-    				if (self.checkedArray && self.checkedArray.length > 1) {
-    					self.contentRoot.removeChild(folder);
-    					target.appendChild(folder);
-        				self.q.run();
-    				}
+    				self._moveServiceHandler.apply(self, [folder, target]);
     			}
         	);
         },
@@ -443,13 +446,34 @@ YUI.add('rl-content-tree-view', function (A) {
     				articleId: entry.get(NODE_ATTR_ID),
     				newFolderId: target.get(NODE_ATTR_ID)
     			}, function(file) {
-    				if (self.checkedArray && self.checkedArray.length > 1) {
-    					self.contentRoot.removeChild(entry);
-    					target.appendChild(entry);
-        				self.q.run();
-    				}
+    				self._moveServiceHandler.apply(self, [entry, target]);
     			}
         	);
+        },
+
+        // gets called after moving an element using liferay services.
+        _moveServiceHandler: function (entry, target) {
+            // if multiple elements are being moved
+            if (this.checkedArray && this.checkedArray.length > 1) {
+                // remove it from it's old folder
+                this.contentRoot.removeChild(entry);
+
+                // make sure the entry is not already added to the target, to avoid duplication
+                var match = target.getChildren().some( function (child) {
+                    return child.get(NODE_ATTR_ENTRY_ID) === entry.get(NODE_ATTR_ENTRY_ID);
+                });
+                
+                // only add the node if it ifs not already there
+                if (!match) {
+                    // add it to its new target
+                    target.appendChild(entry);
+                }
+
+                // move service is done, resume the async queue
+                if (this.q) {
+                    this.q.run();    
+                }
+            }
         },
         
         _mouseOverHandler: function(event){
@@ -517,6 +541,8 @@ YUI.add('rl-content-tree-view', function (A) {
         			this._clickCheckBox(event);  
         		}
         	}
+
+            this.contentTree.get(TOOLTIP_HELPER_PROPERTY).hide();
         	
         },
         
@@ -544,13 +570,12 @@ YUI.add('rl-content-tree-view', function (A) {
         	if (this._isFolder(treeNode)) {
         		// toggle its children 
     			this._toggleChildren(treeNode.getChildren());
-    		} else { // not a folder
-    			// toggle its parent folder recursively
-    			this._toggleEntries(treeNode);
     		}
+            // finally toggle the parent according the state of the given node
+            this._toggleParent(treeNode);
         },
         
-        _toggleEntries: function (treeNode) {
+        _toggleParent: function (treeNode) {
         	// get the parent node
         	var parentNode = treeNode.get(PARENT_NODE);
         	// when the entry is unchecked, all its parents must be unchecked
@@ -563,7 +588,7 @@ YUI.add('rl-content-tree-view', function (A) {
 	        		this._toggleCheckBox(parentNodeId);
 	        		this._toggleCheckedArray(parentNodeId);
 	        		// repeat with all parents
-	        		this._toggleEntries(parentNode);
+	        		this._toggleParent(parentNode);
 	        	}
         	}
         },
@@ -592,7 +617,7 @@ YUI.add('rl-content-tree-view', function (A) {
 
         			// recursively toggle children
         			var childArr = child.getChildren();
-        			if (childArr) {
+        			if (childArr.length && childArr.length > 0) {
         				self._toggleChildren(childArr);
         			}
         		})
@@ -729,6 +754,13 @@ YUI.add('rl-content-tree-view', function (A) {
         		// add checkbox
         		this._addProcessCheckbox(newNodeConfig);
         	}
+
+            boundingBox = this.contentTree.get(BOUNDING_BOX);
+            boundingBox.detach('click');
+            boundingBox.detach('mouseover');
+            boundingBox.delegate('click', A.bind(this._clickHandler,this), NODE_SELECTOR); 
+            boundingBox.delegate('mouseover', A.bind(this._mouseOverHandler,this), NODE_SELECTOR); 
+            this.contentTree.bindUI();
         },
         
         _addProcessCheckbox: function(newNodeConfig){
@@ -744,7 +776,8 @@ YUI.add('rl-content-tree-view', function (A) {
         	}
         },
 
-        _getDLChildren: function(treeNode, instance) {        	   
+        _getDLChildren: function(treeNode, instance) {
+            var self = this;
         	// Get folders children of this folder
         	Liferay.Service(
            			'/content-tree-view-hook.enhanceddlapp/get-folders-and-file-entries-and-file-shortcuts',
@@ -791,11 +824,13 @@ YUI.add('rl-content-tree-view', function (A) {
            				
            				treeNode.set(NODE_ATTR_FULL_LOADED, true);
            	        	treeNode.expand();
+                        self.contentTree.get(TOOLTIP_HELPER_PROPERTY).hide();
            			}
            		); 
         },
         
-        _getWCChildren: function(treeNode, instance) {        	   
+        _getWCChildren: function(treeNode, instance) {
+            var self = this;
         	// Get folders children of this folder
         	Liferay.Service(
            			'/content-tree-view-hook.enhancedjournalapp/get-folders-and-articles',
@@ -840,6 +875,7 @@ YUI.add('rl-content-tree-view', function (A) {
            				
            				treeNode.set(NODE_ATTR_FULL_LOADED, true);
            	        	treeNode.expand();
+                        self.contentTree.get(TOOLTIP_HELPER_PROPERTY).hide();
            			}
            		);
         },
