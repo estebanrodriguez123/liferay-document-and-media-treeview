@@ -328,15 +328,7 @@ YUI.add('rl-content-tree-view', function (A) {
                         }
                     )
     			} , function (file) {
-    				// if multiple elements are being moved
-    				if (self.checkedArray && self.checkedArray.length > 1) {
-    					// remove it from it's old folder
-    					self.contentRoot.removeChild(folder);
-    					// add it to its new target
-    					target.appendChild(folder);
-    					// move service is done, resume the async queue
-        				self.q.run();
-    				}
+                    self._moveServiceHandler.apply(self, [folder, target]);
     			}
         	);
         },
@@ -362,15 +354,7 @@ YUI.add('rl-content-tree-view', function (A) {
                         }
                     )
     			}, function (file) {
-    				// if multiple elements are being moved
-    				if (self.checkedArray && self.checkedArray.length > 1) {
-    					// remove it from it's old folder
-    					self.contentRoot.removeChild(entry);
-    					// add it to its new target
-    					target.appendChild(entry);
-    					// move service is done, resume the async queue
-        				self.q.run();
-    				}
+    				self._moveServiceHandler.apply(self, [entry, target]);
     			}
         	);
         },
@@ -393,11 +377,7 @@ YUI.add('rl-content-tree-view', function (A) {
                         }
                     )
            		 }, function (file) {
-           			if (self.checkedArray && self.checkedArray.length > 1) {
-    					self.contentRoot.removeChild(entry);
-    					target.appendChild(entry);
-        				self.q.run();
-    				}
+           			self._moveServiceHandler.apply(self, [entry, target]);
            		 }
        		);
         },
@@ -420,11 +400,7 @@ YUI.add('rl-content-tree-view', function (A) {
                         }
                     )
     			}, function (file) {
-    				if (self.checkedArray && self.checkedArray.length > 1) {
-    					self.contentRoot.removeChild(folder);
-    					target.appendChild(folder);
-        				self.q.run();
-    				}
+    				self._moveServiceHandler.apply(self, [folder, target]);
     			}
         	);
         },
@@ -443,13 +419,34 @@ YUI.add('rl-content-tree-view', function (A) {
     				articleId: entry.get(NODE_ATTR_ID),
     				newFolderId: target.get(NODE_ATTR_ID)
     			}, function(file) {
-    				if (self.checkedArray && self.checkedArray.length > 1) {
-    					self.contentRoot.removeChild(entry);
-    					target.appendChild(entry);
-        				self.q.run();
-    				}
+    				self._moveServiceHandler.apply(self, [entry, target]);
     			}
         	);
+        },
+
+        // gets called after moving an element using liferay services.
+        _moveServiceHandler: function (entry, target) {
+            // if multiple elements are being moved
+            if (this.checkedArray && this.checkedArray.length > 1) {
+                // remove it from it's old folder
+                this.contentRoot.removeChild(entry);
+
+                // make sure the entry is not already added to the target, to avoid duplication
+                var match = target.getChildren().some( function (child) {
+                    return child.get(NODE_ATTR_ENTRY_ID) === entry.get(NODE_ATTR_ENTRY_ID);
+                });
+                
+                // only add the node if it ifs not already there
+                if (!match) {
+                    // add it to its new target
+                    target.appendChild(entry);
+                }
+
+                // move service is done, resume the async queue
+                if (this.q) {
+                    this.q.run();    
+                }
+            }
         },
         
         _mouseOverHandler: function(event){
@@ -592,7 +589,7 @@ YUI.add('rl-content-tree-view', function (A) {
 
         			// recursively toggle children
         			var childArr = child.getChildren();
-        			if (childArr) {
+        			if (childArr.length && childArr.length > 0) {
         				self._toggleChildren(childArr);
         			}
         		})
