@@ -20,12 +20,23 @@
 <%-- RivetLogic Custom BEGINS --%>
 <%
 String TREE_VIEW = "tree";
-if (themeDisplay.isSignedIn()){
-    int newDisplayIdx = displayViews.length;
-	String[] displayViewsAugmented = Arrays.copyOf(displayViews, displayViews.length + 1);   
-	displayViewsAugmented[newDisplayIdx] = TREE_VIEW;
-	displayViews = displayViewsAugmented;
+if (themeDisplay.isSignedIn()) {
+    boolean inArray = false;
+    // check if the tree view is already added to the display views
+    for (String view: displayViews) {
+        if (view.equals(TREE_VIEW)) {
+            inArray = true; // already added to the display views
+        }
+    }
+
+    if (!inArray) { // only add the view if it was not previously added
+        int newDisplayIdx = displayViews.length;
+        String[] displayViewsAugmented = Arrays.copyOf(displayViews, displayViews.length + 1);   
+        displayViewsAugmented[newDisplayIdx] = TREE_VIEW;
+        displayViews = displayViewsAugmented;
+    }
 }
+
 %>
 
 <aui:script>                   
