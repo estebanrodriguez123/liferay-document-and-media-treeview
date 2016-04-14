@@ -38,21 +38,30 @@ if (themeDisplay.isSignedIn()) {
 }
 
 %>
-
-<aui:script>                   
+<aui:script>
+<%-- 
+  update rlcacheid everytime new version is build for distribution, this 
+  because hooks does not handle well cache and scss processing
+--%>
+<% String rlcacheid = "?build=3"; %>              
 YUI().applyConfig({
     groups : {
         'rivet-custom' : {
-            base : '/html/js/rivetlogic/',
+            base : Liferay.AUI.getJavaScriptRootPath() + '/rivetlogic/',
             async : false,
             modules : {
                 'rl-content-tree-view': {
-                        path: 'rl-content-tree-view.js',
+                        path: 'rl-content-tree-view.js<%=rlcacheid %>',
                         requires: [
+                            'rl-content-tree-view-css',
                             'aui-tree-view',
                             'node-event-simulate'
                         ]
                 },
+                'rl-content-tree-view-css': {
+                        path: 'rl-content-tree-view.css<%=rlcacheid %>',
+                        type: 'css'
+                }
 
             }
         }
